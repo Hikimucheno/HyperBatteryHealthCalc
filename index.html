@@ -485,8 +485,9 @@
                                 }
                                 if (device) autoExtractedInfo.deviceCode = device;
 
-                                // 诊断时间: 从文件头的时间戳提取
-                                const timeMatch = content.match(/------\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/);
+                                // 诊断时间: 只在文件开头 8KB 搜索，避免匹配到后面其他 dump section 的时间戳
+                                const headerSection = content.substring(0, 8192);
+                                const timeMatch = headerSection.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/);
                                 if (timeMatch) autoExtractedInfo.reportTime = timeMatch[1];
 
                                 // batterystats 统计: 只截取 "Statistics since last charge:" 后面 3KB
