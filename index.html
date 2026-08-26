@@ -3,7 +3,7 @@
 
 <!--
         Copyright (c) HikiMu慕鱼酱 All rights reserved.
-        Version: 26.08.27 (github版本 1.5 - 多设备电池解析增强)
+        Version: 26.08.27 (github版本 1.6 - UI重构 + 解析提速)
 -->
 
 <head>
@@ -14,420 +14,248 @@
     <meta name="keywords" content="电池容量计算器, 诊断文件处理, 电池健康度, 电池容量百分比, zip.js库, HyperOS电池容量, MIUI电池容量, 电池容量提取工具, 电池健康度检测">
     <script src="js/zip.min.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body {
-            font-family: 'Arial', 'sans-serif', 'Misans';
-            max-width: 800px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            max-width: 860px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f8f9fa;
-            color: #2d3748;
+            padding: 32px 24px;
+            background: #ffffff;
+            color: #24292f;
+            line-height: 1.6;
+            font-size: 14px;
         }
-
-        .container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
-        }
-
         h1 {
-            color: #2b6cb0;
-            text-align: center;
-            margin-bottom: 25px;
+            font-size: 24px;
             font-weight: 600;
-            font-size: 28px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            margin: 0 0 8px 0;
+            color: #24292f;
+            border-bottom: 1px solid #d0d7de;
+            padding-bottom: 12px;
         }
-
+        .subtitle {
+            color: #57606a;
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
         .instructions {
-            margin-bottom: 25px;
-            padding: 18px;
-            background: linear-gradient(135deg, #ebf8ff 0%, #e6fffa 100%);
-            border-radius: 8px;
-            border-left: 5px solid #4299e1;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+            margin-bottom: 20px;
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
         }
-
-
         .instructions summary {
-            padding: 0;
-            font-weight: 700;
-            font-size: 1.15rem;
+            font-weight: 600;
             cursor: pointer;
-            list-style: none;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            color: #2b6cb0;
-            margin-bottom: 8px;
+            color: #24292f;
+            font-size: 14px;
         }
-        .instructions summary::-webkit-details-marker {
-            display: none;
-        }
-        .instructions summary::after {
-            content: " ▼";
-            font-size: 1rem;
-            color: #4299e1;
-            transition: transform 0.2s;
-        }
-        .instructions[open] summary::after {
-            content: " ▲";
-        }
-        .instructions[open] {
-            padding-bottom: 8px;
-        }
-        .instructions p, .instructions iframe {
-            margin-top: 12px;
-            margin-bottom: 12px;
-        }
-        .instructions iframe {
-            border-radius: 6px;
-            margin-top: 15px;
-        }
-
-        .file-upload {
-            margin-bottom: 25px;
-        }
-
+        .instructions summary::-webkit-details-marker { display: none; }
+        .instructions summary::before { content: "▶ "; font-size: 10px; color: #57606a; }
+        .instructions[open] summary::before { content: "▼ "; }
+        .instructions p, .instructions ol { margin: 10px 0; font-size: 13px; color: #57606a; }
+        .instructions ol { padding-left: 20px; }
+        .file-upload { margin-bottom: 16px; }
         .file-upload label {
             display: block;
-            margin-bottom: 8px;
             font-weight: 600;
-            color: #2d3748;
-            font-size: 15px;
+            margin-bottom: 6px;
+            font-size: 14px;
         }
-
-        .file-upload input {
-    display: block;
-    width: 100%;
-    padding: 16px 20px;
-    margin-top: 10px;
-    border: 2px dashed #cbd5e0;
-    border-radius: 8px;
-    box-sizing: border-box;
-    background-color: #f7fafc;
-    transition: all 0.3s ease;
-    font-size: 1.1rem;
-    cursor: pointer;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-}
-
-        .file-upload input:hover {
-            border-color: #4299e1;
-            background-color: #edf2f7;
-        }
-
-        .file-upload input::file-selector-button {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            border: none;
-            color: white;
-            padding: 10px 18px;
-            border-radius: 6px;
-            font-weight: 600;
-            margin-right: 15px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-            box-shadow: 0 2px 4px rgba(66, 153, 225, 0.2);
-            font-size: 0.9rem;
-        }
-
-        .file-upload input::file-selector-button:hover {
-            background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
-            box-shadow: 0 4px 8px rgba(66, 153, 225, 0.3);
-            transform: translateY(-1px);
-        }
-
-        .input-group {
-            margin-bottom: 25px;
-            transition: all 0.3s ease;
-            display: none;
-        }
-
-        .input-group label {
+        .file-upload input[type="file"] {
             display: block;
-            margin-bottom: 10px;
-            font-weight: 600;
-            color: #2d3748;
-            font-size: 15px;
+            width: 100%;
+            padding: 16px;
+            border: 1px dashed #d0d7de;
+            border-radius: 4px;
+            background: #f6f8fa;
+            font-size: 13px;
+            cursor: pointer;
         }
-
+        .file-upload input[type="file"]:hover { border-color: #0969da; background: #ddf4ff; }
+        .file-upload input::file-selector-button {
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            color: #24292f;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-right: 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .file-upload input::file-selector-button:hover { background: #eaeef2; }
+        .input-group { margin-bottom: 16px; display: none; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
         .input-group input {
             width: 100%;
-            padding: 14px;
-            box-sizing: border-box;
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
-            background-color: #ffffff;
-            transition: all 0.3s ease;
-            font-size: 15px;
+            padding: 8px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            font-size: 14px;
         }
-
-        .input-group input:focus {
-            border-color: #4299e1;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-            outline: none;
-        }
-
+        .input-group input:focus { border-color: #0969da; outline: none; box-shadow: 0 0 0 3px rgba(9,105,218,0.15); }
         button {
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            color: white;
-            border: none;
-            padding: 14px 20px;
-            border-radius: 8px;
+            background: #1f883d;
+            color: #ffffff;
+            border: 1px solid #1f883d;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            width: 100%;
+        }
+        button:hover { background: #1a7f37; }
+        .status {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            display: none;
+            font-size: 13px;
+            color: #57606a;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 0;
+            display: none;
+        }
+        .result-header {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #d0d7de;
+        }
+        .result-header h3 {
+            margin: 0;
             font-size: 16px;
             font-weight: 600;
-            width: 100%;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(72, 187, 120, 0.2);
         }
-
-        button:hover {
-            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-            box-shadow: 0 4px 8px rgba(72, 187, 120, 0.3);
-            transform: translateY(-1px);
-        }
-
-        .status {
-            margin-top: 20px;
-            padding: 16px;
-            background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
-            border-radius: 8px;
-            display: none;
-            border-left: 5px solid #4299e1;
-            color: #2d3748;
-            font-weight: 500;
-        }
-
-        .result {
-            margin-top: 25px;
-            padding: 20px;
-            border-radius: 8px;
-            display: none;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-
-        .success {
-            background: linear-gradient(135deg, #f0fff4 0%, #e6fffa 100%);
-            color: #22543d;
-            border-left: 5px solid #48bb78;
-        }
-
-        .error {
-            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
-            color: #742a2a;
-            border-left: 5px solid #f56565;
-        }
-
-        .result-header {
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
         .result-content {
-            margin-bottom: 18px;
+            margin-bottom: 16px;
         }
-
+        .result-content p {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        .result-content strong { font-weight: 600; }
         .result-content pre {
-            background-color: #f7fafc;
+            background: #f6f8fa;
             padding: 12px;
-            border-radius: 6px;
-            font-family: 'Cascadia Code', 'Courier New', monospace;
+            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
             white-space: pre-wrap;
             overflow-wrap: break-word;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #d0d7de;
+            margin: 8px 0;
         }
-
+        .success { border-left: 3px solid #1f883d; padding-left: 12px; }
+        .error { border-left: 3px solid #cf222e; padding-left: 12px; color: #cf222e; }
         .toggle-btn {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            border-radius: 6px;
+            background: #f6f8fa;
+            color: #24292f;
+            border: 1px solid #d0d7de;
+            padding: 6px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            margin-top: 12px;
+            margin-top: 8px;
             display: inline-block;
             font-weight: 500;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 4px rgba(66, 153, 225, 0.2);
+            font-size: 13px;
+            width: auto;
         }
-
-        .toggle-btn:hover {
-            background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
-            box-shadow: 0 4px 8px rgba(66, 153, 225, 0.3);
-            transform: translateY(-1px);
-        }
-
+        .toggle-btn:hover { background: #eaeef2; }
         .original-text {
             display: none;
             margin-top: 12px;
-            padding: 20px;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            border-radius: 8px;
+            padding: 16px;
+            background: #f6f8fa;
+            border-radius: 4px;
             white-space: pre-wrap;
             overflow-wrap: break-word;
-            border: 1px solid #e2e8f0;
-            font-family: 'Cascadia Code', 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            color: #334155;
-            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            border: 1px solid #d0d7de;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #24292f;
             max-height: 500px;
             overflow-y: auto;
-            tab-size: 4;
-            -moz-tab-size: 4;
         }
-
-        .original-text .battery-key {
-            color: #dc2626;
-            font-weight: 600;
-            background-color: #fef2f2;
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
-        .original-text .capacity-value {
-            color: #059669;
-            font-weight: 600;
-            background-color: #f0fdf4;
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
-        .original-text .time-value {
-            color: #7c3aed;
-            font-weight: 500;
-            background-color: #faf5ff;
-            padding: 1px 4px;
-            border-radius: 3px;
-        }
-
+        .original-text .battery-key { color: #cf222e; font-weight: 600; }
+        .original-text .capacity-value { color: #1a7f37; font-weight: 600; }
+        .original-text .time-value { color: #8250df; }
         .original-text .section-title {
-            text-align: left;
-            font-weight: 700;
-            font-size: 15px;
-            color: #1e293b;
-            margin: 20px 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #e2e8f0;
-            font-family: 'Arial', 'sans-serif', 'Misans';
+            font-weight: 600;
+            font-size: 13px;
+            color: #24292f;
+            margin: 16px 0 8px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #d0d7de;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
         }
-
-        .original-text .section-title:first-child {
-            margin-top: 0;
-        }
-
-        .original-text .content-block {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .original-text .content-block pre {
-            text-align: left;
-            margin: 0;
-            padding: 0;
-            background: transparent;
-            border: none;
-            font-family: 'Cascadia Code', 'Courier New', monospace;
-        }
-
-        .original-text::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .original-text::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 4px;
-        }
-
-        .original-text::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-
-        .original-text::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
+        .original-text .section-title:first-child { margin-top: 0; }
+        .original-text .content-block { margin-bottom: 16px; }
+        .original-text .content-block pre { margin: 0; padding: 0; background: transparent; border: none; }
         .footer {
             text-align: center;
-            margin-top: 25px;
-            font-size: 14px;
-            color: #718096;
+            margin-top: 24px;
+            font-size: 12px;
+            color: #57606a;
+            border-top: 1px solid #d0d7de;
+            padding-top: 16px;
         }
-
-        .footer a {
-            color: #4299e1;
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        .footer a:hover {
-            color: #3182ce;
-            text-decoration: underline;
-        }
-
+        .footer a { color: #0969da; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
         .open-source-links {
-            margin-top: 12px;
+            margin-top: 8px;
             display: flex;
             justify-content: center;
             gap: 12px;
         }
-
-        .open-source-links span {
-            color: #a0aec0;
-        }
-
+        .open-source-links span { color: #8c959f; }
         .open-source-links a {
-            color: #4a5568;
+            color: #57606a;
             text-decoration: none;
             font-weight: 500;
-            transition: color 0.3s ease;
-            font-family: 'Cascadia Code', 'Arial', sans-serif;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
         }
-
-        .open-source-links a:hover {
-            color: #2d3748;
-            text-decoration: underline;
-        }
-
+        .open-source-links a:hover { color: #24292f; text-decoration: underline; }
         .media-alert {
-            margin-top: 25px;
-            padding: 20px;
-            background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
-            border-radius: 8px;
-            border-left: 5px solid #ed8936;
-        }
-
-        .media-alert h2 {
-            color: #744210;
-            margin-bottom: 12px;
-        }
-
-        .media-alert p {
-            color: #744210;
-            line-height: 1.6;
-        }
-
-        .media-highlight {
-            background-color: #fed7d7;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 600;
-        }
-
-        code,
-        .english-text {
-            font-family: 'Cascadia Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        }
-
-        #calculate-btn {
+            margin-top: 16px;
+            padding: 10px 14px;
+            background: #fff8c5;
+            border: 1px solid #d4a72c;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #7d4e00;
             display: none;
+        }
+        .capacity-compare {
+            background: #f6f8fa;
+            padding: 10px 14px;
+            border-radius: 4px;
+            border: 1px solid #d0d7de;
+            margin-top: 8px;
+        }
+        .capacity-compare p { margin: 3px 0; font-size: 13px; }
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 6px;
+        }
+        .tag-auto { background: #dafbe1; color: #1a7f37; }
+        .tag-manual { background: #fff1e5; color: #9a6700; }
+        .tag-source { background: #eaeef2; color: #57606a; font-size: 11px; }
+        @media (max-width: 600px) {
+            body { padding: 16px 12px; }
+            h1 { font-size: 20px; }
         }
     </style>
 </head>
@@ -608,36 +436,73 @@
                             if (innerEntry.filename.includes('bugreport') && innerEntry.filename.endsWith('.txt')) {
                                 const content = await innerEntry.getData(new zip.TextWriter());
 
-                                const deviceInfo = extractDeviceInfoFromText(content);
-                                if (deviceInfo.marketName) {
-                                    autoExtractedInfo.deviceName = deviceInfo.marketName;
-                                    autoExtractedInfo.deviceModel = deviceInfo.marketName;
-                                } else if (deviceInfo.model) {
-                                    autoExtractedInfo.deviceName = deviceInfo.model;
-                                    autoExtractedInfo.deviceModel = deviceInfo.model;
-                                }
-                                if (deviceInfo.device) {
-                                    autoExtractedInfo.deviceCode = deviceInfo.device;
+                                // 用 indexOf 定位关键片段，避免对整个大文件做全量正则匹配
+                                const grabLine = (text, marker) => {
+                                    const idx = text.indexOf(marker);
+                                    if (idx === -1) return null;
+                                    const end = text.indexOf('\n', idx);
+                                    return text.substring(idx, end === -1 ? text.length : end);
+                                };
+                                const grabSection = (text, marker, maxLen) => {
+                                    const idx = text.indexOf(marker);
+                                    if (idx === -1) return null;
+                                    return text.substring(idx, Math.min(idx + maxLen, text.length));
+                                };
+
+                                // 设备信息: 只读取 ro.product 相关行
+                                const marketLine = grabLine(content, '[ro.product.marketname]');
+                                const modelLine = grabLine(content, '[ro.product.model]');
+                                const deviceLine = grabLine(content, '[ro.product.device]');
+                                const brandLine = grabLine(content, '[ro.product.brand]');
+                                const fpLine = grabLine(content, 'Build fingerprint:');
+
+                                let marketName = null, model = null, device = null, brand = null;
+                                if (marketLine) { const m = marketLine.match(/\[([^\]]+)\]/g); if (m && m[1]) marketName = m[1].slice(1, -1); }
+                                if (modelLine) { const m = modelLine.match(/\[([^\]]+)\]/g); if (m && m[1]) model = m[1].slice(1, -1); }
+                                if (deviceLine) { const m = deviceLine.match(/\[([^\]]+)\]/g); if (m && m[1]) device = m[1].slice(1, -1); }
+                                if (brandLine) { const m = brandLine.match(/\[([^\]]+)\]/g); if (m && m[1]) brand = m[1].slice(1, -1); }
+
+                                // Build fingerprint 兜底
+                                if ((!marketName || !device) && fpLine) {
+                                    const fpMatch = fpLine.match(/['"]([^'"]+)['"]/);
+                                    if (fpMatch) {
+                                        const parts = fpMatch[1].split('/');
+                                        if (parts.length >= 3) {
+                                            if (!brand) brand = parts[0];
+                                            if (!device) device = parts[1];
+                                            if (!marketName && DEVICE_CODE_MAP[parts[1]]) marketName = DEVICE_CODE_MAP[parts[1]];
+                                            if (!model && DEVICE_CODE_MAP[parts[1]]) model = DEVICE_CODE_MAP[parts[1]];
+                                        }
+                                    }
                                 }
 
-                                const extractedData = extractDataFromText(content);
-                                if (extractedData.reportTime) {
-                                    autoExtractedInfo.reportTime = extractedData.reportTime;
+                                if (marketName) {
+                                    autoExtractedInfo.deviceName = marketName;
+                                    autoExtractedInfo.deviceModel = marketName;
+                                } else if (model) {
+                                    autoExtractedInfo.deviceName = model;
+                                    autoExtractedInfo.deviceModel = model;
                                 }
+                                if (device) autoExtractedInfo.deviceCode = device;
 
-                                if (extractedData.statistics) {
-                                    const stats = extractBatteryCapacityFromStatistics(extractedData.statistics);
+                                // 诊断时间: 从文件头的时间戳提取
+                                const timeMatch = content.match(/------\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/);
+                                if (timeMatch) autoExtractedInfo.reportTime = timeMatch[1];
+
+                                // batterystats 统计: 只截取 "Statistics since last charge:" 后面 3KB
+                                const statsSection = grabSection(content, 'Statistics since last charge:', 3072);
+                                if (statsSection) {
+                                    const stats = extractBatteryCapacityFromStatistics(statsSection);
                                     Object.assign(autoExtractedInfo, stats);
                                     if (stats.lastLearnedCapacity) {
                                         autoExtractedInfo.capacitySources.push({ value: stats.lastLearnedCapacity, source: 'batterystats learned' });
                                     }
-                                    // batterystats 的 Estimated battery capacity 就是系统报告的设计容量，自动填充
                                     if (!autoExtractedInfo.designCapacity && stats.estimatedCapacity) {
                                         autoExtractedInfo.designCapacity = stats.estimatedCapacity;
                                     }
                                 }
 
-                                // 兜底: 设备代号 -> 设计容量映射表
+                                // 设备代号 -> 设计容量映射表兜底
                                 if (!autoExtractedInfo.designCapacity && autoExtractedInfo.deviceCode) {
                                     const capMap = getDesignCapacityMap();
                                     if (capMap[autoExtractedInfo.deviceCode]) {
@@ -645,36 +510,51 @@
                                     }
                                 }
 
-                                const dumpsys = extractDumpsysBattery(content);
-                                if (dumpsys.level !== null) {
-                                    autoExtractedInfo.dumpsys = dumpsys;
-                                    autoExtractedInfo.voltage = dumpsys.voltage;
-                                    autoExtractedInfo.temperature = dumpsys.temperature;
-                                    autoExtractedInfo.technology = dumpsys.technology;
-                                    autoExtractedInfo.batteryStatus = dumpsys.status;
-                                    autoExtractedInfo.batteryHealth = dumpsys.health;
-                                    autoExtractedInfo.batteryLevel = dumpsys.level;
-                                }
-
-                                const fuelGauge = extractFuelGaugeData(content);
-                                if (fuelGauge.bf !== null) {
-                                    autoExtractedInfo.fuelGauge = fuelGauge;
-                                    autoExtractedInfo.capacitySources.push({ value: fuelGauge.bf, source: 'kernel fuel gauge bf' });
-                                    if (fuelGauge.bc !== null) {
-                                        autoExtractedInfo.cycleCount = fuelGauge.bc;
+                                // dumpsys battery: 只截取 "DUMP OF SERVICE battery:" 后面 2KB
+                                const dumpsysSection = grabSection(content, 'DUMP OF SERVICE battery:', 2048);
+                                if (dumpsysSection) {
+                                    const dumpsys = extractDumpsysBattery(dumpsysSection);
+                                    if (dumpsys.level !== null) {
+                                        autoExtractedInfo.dumpsys = dumpsys;
+                                        autoExtractedInfo.voltage = dumpsys.voltage;
+                                        autoExtractedInfo.temperature = dumpsys.temperature;
+                                        autoExtractedInfo.technology = dumpsys.technology;
+                                        autoExtractedInfo.batteryStatus = dumpsys.status;
+                                        autoExtractedInfo.batteryHealth = dumpsys.health;
+                                        autoExtractedInfo.batteryLevel = dumpsys.level;
                                     }
                                 }
 
-                                const totalCap = extractTotalBatteryCapacity(content);
-                                if (totalCap !== null) {
-                                    autoExtractedInfo.totalBatteryCapacity = totalCap;
-                                    autoExtractedInfo.capacitySources.push({ value: totalCap, source: 'DeviceStatisticsService' });
+                                // fuel gauge: 只读取 fg_update_status 那一行
+                                const fgLine = grabLine(content, 'fg_update_status::');
+                                if (fgLine) {
+                                    const fuelGauge = extractFuelGaugeData(fgLine);
+                                    if (fuelGauge.bf !== null) {
+                                        autoExtractedInfo.fuelGauge = fuelGauge;
+                                        autoExtractedInfo.capacitySources.push({ value: fuelGauge.bf, source: 'kernel fuel gauge bf' });
+                                        if (fuelGauge.bc !== null) autoExtractedInfo.cycleCount = fuelGauge.bc;
+                                    }
                                 }
 
-                                const chargeFull = extractChargeFull(content);
-                                if (chargeFull !== null) {
-                                    autoExtractedInfo.chargeFull = chargeFull;
-                                    autoExtractedInfo.capacitySources.push({ value: chargeFull, source: 'BL-BSHelper charge_full' });
+                                // totalBatteryCapacity: 只读取那一行
+                                const totalCapLine = grabLine(content, 'totalBatteryCapacity=');
+                                if (totalCapLine) {
+                                    const m = totalCapLine.match(/totalBatteryCapacity=(\d+)/);
+                                    if (m) {
+                                        autoExtractedInfo.totalBatteryCapacity = parseInt(m[1]);
+                                        autoExtractedInfo.capacitySources.push({ value: parseInt(m[1]), source: 'DeviceStatisticsService' });
+                                    }
+                                }
+
+                                // charge_full: 只读取那一行
+                                const chargeFullLine = grabLine(content, 'charge_full=');
+                                if (chargeFullLine) {
+                                    const m = chargeFullLine.match(/charge_full=(\d+)/);
+                                    if (m) {
+                                        const cf = parseInt(m[1]) / 1000;
+                                        autoExtractedInfo.chargeFull = cf;
+                                        autoExtractedInfo.capacitySources.push({ value: cf, source: 'BL-BSHelper charge_full' });
+                                    }
                                 }
                             }
                         }
@@ -1174,45 +1054,40 @@
                                     <p><strong>基本信息</strong></p>
                             `;
 
-                                    // 显示设备型号（如果提取到）
+                                    // 设备型号
                                     if (autoExtractedInfo.deviceName || autoExtractedInfo.deviceModel) {
                                         const deviceName = autoExtractedInfo.deviceName || autoExtractedInfo.deviceModel;
                                         resultMessage += `<p>设备型号: <strong>${deviceName}</strong>`;
                                         if (autoExtractedInfo.deviceCode) {
-                                            resultMessage += ` <span style="color: #888; font-size: 0.9em;">(代号: ${autoExtractedInfo.deviceCode})</span>`;
+                                            resultMessage += ` <span class="tag tag-source">代号: ${autoExtractedInfo.deviceCode}</span>`;
                                         }
                                         resultMessage += `</p>`;
                                     }
 
-                                    // 显示诊断时间（如果提取到）
+                                    // 诊断时间
                                     if (autoExtractedInfo.reportTime) {
                                         resultMessage += `<p>诊断时间: <strong>${autoExtractedInfo.reportTime}</strong></p>`;
                                     }
 
-                                    resultMessage += `
-                                    <p>原始设计容量: <strong>${finalInitialCapacity} mAh</strong>
-                                    ${autoExtractedInfo.designCapacity ? '<span style="color: green;">(自动检测)</span>' : '<span style="color: orange;">(手动输入)</span>'}</p>
-                                    <p>当前实际容量: <strong>${currentCapacity} mAh</strong>
-                                    ${currentCapacitySource ? `<span style="color: #666; font-size: 0.9em;">(来源: ${currentCapacitySource})</span>` : ''}</p>
-                                    <p>电池健康度: <strong>${percentage.toFixed(2)}%</strong> <span style="margin-left: 10px; font-size: 0.9em; color: ${getRatingColor(percentage)}">(${rating})</span></p>
-                            `;
-
-                                    // 电池实时状态 (来自 dumpsys battery)
-                                    if (autoExtractedInfo.dumpsys) {
-                                        resultMessage += `<p><strong>电池实时状态</strong></p>`;
-                                        const d = autoExtractedInfo.dumpsys;
-                                        if (d.level !== null && d.level !== undefined) resultMessage += `<p>当前电量: <strong>${d.level}%</strong></p>`;
-                                        if (d.voltage !== null && d.voltage !== undefined) resultMessage += `<p>电池电压: <strong>${(d.voltage / 1000).toFixed(3)} V</strong> (${d.voltage} mV)</p>`;
-                                        if (d.temperature !== null && d.temperature !== undefined) resultMessage += `<p>电池温度: <strong>${d.temperature}°C</strong></p>`;
-                                        if (d.technology) resultMessage += `<p>电池类型: <strong>${d.technology}</strong></p>`;
-                                        if (d.status !== null && d.status !== undefined) resultMessage += `<p>充电状态: <strong>${getBatteryStatusText(d.status)}</strong></p>`;
-                                        if (d.health !== null && d.health !== undefined) resultMessage += `<p>健康状态: <strong>${getBatteryHealthText(d.health)}</strong></p>`;
+                                    // 充电循环次数 (移到基本信息)
+                                    const cycleVal = autoExtractedInfo.fuelGauge && autoExtractedInfo.fuelGauge.bc !== null
+                                        ? autoExtractedInfo.fuelGauge.bc
+                                        : autoExtractedInfo.cycleCount;
+                                    if (cycleVal !== null && cycleVal !== undefined) {
+                                        resultMessage += `<p>充电循环: <strong>${cycleVal} 次</strong></p>`;
+                                    } else {
+                                        resultMessage += `<p>充电循环: <strong>未检测到</strong></p>`;
                                     }
 
                                     resultMessage += `
-                                <p><strong>电池硬件信息</strong></p>
+                                    <p>原始设计容量: <strong>${finalInitialCapacity} mAh</strong>
+                                    <span class="tag ${autoExtractedInfo.designCapacity ? 'tag-auto' : 'tag-manual'}">${autoExtractedInfo.designCapacity ? '自动检测' : '手动输入'}</span></p>
+                                    <p>当前实际容量: <strong>${currentCapacity} mAh</strong>
+                                    ${currentCapacitySource ? `<span class="tag tag-source">${currentCapacitySource}</span>` : ''}</p>
+                                    <p>电池健康度: <strong>${percentage.toFixed(2)}%</strong> <span class="tag" style="background:${getRatingColor(percentage)}15;color:${getRatingColor(percentage)}">${rating}</span></p>
                             `;
 
+                                    // 学习容量相关 (移到基本信息)
                                     if (autoExtractedInfo.estimatedCapacity) {
                                         resultMessage += `<p>估算满充容量: <strong>${autoExtractedInfo.estimatedCapacity} mAh</strong></p>`;
                                     }
@@ -1226,13 +1101,24 @@
                                         resultMessage += `<p>最大学习容量: <strong>${autoExtractedInfo.maxLearnedCapacity} mAh</strong></p>`;
                                     }
 
+                                    // 电池实时状态 (来自 dumpsys battery)
+                                    if (autoExtractedInfo.dumpsys) {
+                                        resultMessage += `<p style="margin-top:12px;"><strong>电池实时状态</strong></p>`;
+                                        const d = autoExtractedInfo.dumpsys;
+                                        if (d.level !== null && d.level !== undefined) resultMessage += `<p>当前电量: <strong>${d.level}%</strong></p>`;
+                                        if (d.voltage !== null && d.voltage !== undefined) resultMessage += `<p>电池电压: <strong>${(d.voltage / 1000).toFixed(3)} V</strong> (${d.voltage} mV)</p>`;
+                                        if (d.temperature !== null && d.temperature !== undefined) resultMessage += `<p>电池温度: <strong>${d.temperature}°C</strong></p>`;
+                                        if (d.technology) resultMessage += `<p>电池类型: <strong>${d.technology}</strong></p>`;
+                                        if (d.status !== null && d.status !== undefined) resultMessage += `<p>充电状态: <strong>${getBatteryStatusText(d.status)}</strong></p>`;
+                                        if (d.health !== null && d.health !== undefined) resultMessage += `<p>健康状态: <strong>${getBatteryHealthText(d.health)}</strong></p>`;
+                                    }
+
                                     // Fuel Gauge 详细数据
                                     if (autoExtractedInfo.fuelGauge) {
                                         const fg = autoExtractedInfo.fuelGauge;
-                                        resultMessage += `<p style="margin-top: 12px;"><strong>内核 Fuel Gauge 数据</strong></p>`;
+                                        resultMessage += `<p style="margin-top:12px;"><strong>内核 Fuel Gauge 数据</strong></p>`;
                                         if (fg.bf !== null) resultMessage += `<p>满电容量 (bf): <strong>${fg.bf} mAh</strong></p>`;
                                         if (fg.rm !== null) resultMessage += `<p>剩余容量 (rm): <strong>${fg.rm} mAh</strong></p>`;
-                                        if (fg.bc !== null) resultMessage += `<p>循环次数 (bc): <strong>${fg.bc} 次</strong></p>`;
                                         if (fg.ssoc !== null) resultMessage += `<p>系统SOC (ssoc): <strong>${fg.ssoc}%</strong></p>`;
                                         if (fg.rsoc !== null) resultMessage += `<p>原始SOC (rsoc): <strong>${fg.rsoc}%</strong></p>`;
                                         if (fg.vbat !== null) resultMessage += `<p>电池电压 (vbat): <strong>${(fg.vbat / 1000).toFixed(3)} V</strong></p>`;
@@ -1241,21 +1127,13 @@
                                         if (fg.version !== null) resultMessage += `<p>固件版本: <strong>${fg.version}</strong></p>`;
                                     }
 
-                                    // 循环次数 (如果 fuel gauge 没有但其他来源有)
-                                    if (autoExtractedInfo.cycleCount && (!autoExtractedInfo.fuelGauge || autoExtractedInfo.fuelGauge.bc === null)) {
-                                        resultMessage += `<p>充电循环次数: <strong>${autoExtractedInfo.cycleCount} 次</strong></p>`;
-                                        resultMessage += `<p style="font-size: 0.9em; color: #666;">满充容量会随着循环次数的增加而逐渐减少</p>`;
-                                    } else if (!autoExtractedInfo.cycleCount) {
-                                        resultMessage += `<p>充电循环次数: <strong>未检测到</strong> (部分机型在内核 fuel gauge 中提供)</p>`;
-                                    }
-
                                     // 多来源容量对比
                                     if (autoExtractedInfo.capacitySources && autoExtractedInfo.capacitySources.length > 1) {
-                                        resultMessage += `<p style="margin-top: 12px;"><strong>多来源容量对比</strong></p>`;
-                                        resultMessage += `<div style="background: #f7fafc; padding: 10px; border-radius: 6px; font-size: 0.9em;">`;
+                                        resultMessage += `<p style="margin-top:12px;"><strong>多来源容量对比</strong></p>`;
+                                        resultMessage += `<div class="capacity-compare">`;
                                         for (const src of autoExtractedInfo.capacitySources) {
                                             const pct = ((src.value / finalInitialCapacity) * 100).toFixed(1);
-                                            resultMessage += `<p style="margin: 4px 0;">${src.source}: <strong>${src.value} mAh</strong> (${pct}%)</p>`;
+                                            resultMessage += `<p>${src.source}: <strong>${src.value} mAh</strong> (${pct}%)</p>`;
                                         }
                                         resultMessage += `</div>`;
                                     }
@@ -1277,7 +1155,7 @@
                                         <button class="toggle-btn" onclick="toggleOriginalText(this)">显示电池详细信息</button>
                                         <div class="original-text" id="${originalTextId}">
                                             <div class="content-block">
-                                                <div class="section-title">🔍 电池关键信息翻译</div>
+                                                <div class="section-title">电池关键信息翻译</div>
                                                 <div style="background: #f0f8ff; padding: 12px; border-radius: 6px; margin-top: 8px;">
                                                     ${batteryTranslatedText}
                                                 </div>
@@ -1414,3 +1292,4 @@
 </body>
 
 </html>
+
