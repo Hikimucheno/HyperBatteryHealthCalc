@@ -3,7 +3,7 @@
 
 <!--
         Copyright (c) HikiMu慕鱼酱 All rights reserved.
-        Version: 26.03.11 (github版本 1.4)
+        Version: 26.08.27 (github版本 1.5 - 多设备电池解析增强)
 -->
 
 <head>
@@ -505,13 +505,25 @@
             designCapacity: null,
             deviceModel: null,
             deviceName: null,
+            deviceCode: null,
             reportTime: null,
             cycleCount: null,
             fullCapacity: null,
             estimatedCapacity: null,
             lastLearnedCapacity: null,
             minLearnedCapacity: null,
-            maxLearnedCapacity: null
+            maxLearnedCapacity: null,
+            totalBatteryCapacity: null,
+            chargeFull: null,
+            voltage: null,
+            temperature: null,
+            technology: null,
+            batteryStatus: null,
+            batteryHealth: null,
+            batteryLevel: null,
+            fuelGauge: null,
+            dumpsys: null,
+            capacitySources: []
         };
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -524,13 +536,25 @@
                 designCapacity: null,
                 deviceModel: null,
                 deviceName: null,
+                deviceCode: null,
                 reportTime: null,
                 cycleCount: null,
                 fullCapacity: null,
                 estimatedCapacity: null,
                 lastLearnedCapacity: null,
                 minLearnedCapacity: null,
-                maxLearnedCapacity: null
+                maxLearnedCapacity: null,
+                totalBatteryCapacity: null,
+                chargeFull: null,
+                voltage: null,
+                temperature: null,
+                technology: null,
+                batteryStatus: null,
+                batteryHealth: null,
+                batteryLevel: null,
+                fuelGauge: null,
+                dumpsys: null,
+                capacitySources: []
             };
 
             document.getElementById('manual-input-container').style.display = 'none';
@@ -592,6 +616,9 @@
                                     autoExtractedInfo.deviceName = deviceInfo.model;
                                     autoExtractedInfo.deviceModel = deviceInfo.model;
                                 }
+                                if (deviceInfo.device) {
+                                    autoExtractedInfo.deviceCode = deviceInfo.device;
+                                }
 
                                 const extractedData = extractDataFromText(content);
                                 if (extractedData.reportTime) {
@@ -601,6 +628,41 @@
                                 if (extractedData.statistics) {
                                     const stats = extractBatteryCapacityFromStatistics(extractedData.statistics);
                                     Object.assign(autoExtractedInfo, stats);
+                                    if (stats.lastLearnedCapacity) {
+                                        autoExtractedInfo.capacitySources.push({ value: stats.lastLearnedCapacity, source: 'batterystats learned' });
+                                    }
+                                }
+
+                                const dumpsys = extractDumpsysBattery(content);
+                                if (dumpsys.level !== null) {
+                                    autoExtractedInfo.dumpsys = dumpsys;
+                                    autoExtractedInfo.voltage = dumpsys.voltage;
+                                    autoExtractedInfo.temperature = dumpsys.temperature;
+                                    autoExtractedInfo.technology = dumpsys.technology;
+                                    autoExtractedInfo.batteryStatus = dumpsys.status;
+                                    autoExtractedInfo.batteryHealth = dumpsys.health;
+                                    autoExtractedInfo.batteryLevel = dumpsys.level;
+                                }
+
+                                const fuelGauge = extractFuelGaugeData(content);
+                                if (fuelGauge.bf !== null) {
+                                    autoExtractedInfo.fuelGauge = fuelGauge;
+                                    autoExtractedInfo.capacitySources.push({ value: fuelGauge.bf, source: 'kernel fuel gauge bf' });
+                                    if (fuelGauge.bc !== null) {
+                                        autoExtractedInfo.cycleCount = fuelGauge.bc;
+                                    }
+                                }
+
+                                const totalCap = extractTotalBatteryCapacity(content);
+                                if (totalCap !== null) {
+                                    autoExtractedInfo.totalBatteryCapacity = totalCap;
+                                    autoExtractedInfo.capacitySources.push({ value: totalCap, source: 'DeviceStatisticsService' });
+                                }
+
+                                const chargeFull = extractChargeFull(content);
+                                if (chargeFull !== null) {
+                                    autoExtractedInfo.chargeFull = chargeFull;
+                                    autoExtractedInfo.capacitySources.push({ value: chargeFull, source: 'BL-BSHelper charge_full' });
                                 }
                             }
                         }
@@ -627,42 +689,108 @@
             }
         }
 
+        // 常见设备代号映射 (代号 -> 市场名称)
+        const DEVICE_CODE_MAP = {
+            'marble': 'Redmi Note 12 Turbo',
+            'nuwa': 'Xiaomi 13 Pro',
+            'fuxi': 'Xiaomi 13',
+            'shennong': 'Xiaomi 14',
+            'houji': 'Xiaomi 14 Pro',
+            'shennongp': 'Xiaomi 14 Ultra',
+            'duchamp': 'Redmi K70',
+            'mondrian': 'Redmi K70 Pro',
+            'vermeer': 'Redmi K70E',
+            'rock': 'Redmi Note 13 Pro+',
+            'gold': 'Redmi Note 13 Pro',
+            'sapphire': 'Redmi Note 12 Pro+',
+            'ruby': 'Redmi Note 12 Pro',
+            'stone': 'Redmi Note 12 5G',
+            'xaga': 'Redmi Note 11T Pro',
+            'xagapro': 'Redmi Note 11T Pro+',
+            'zizhan': 'Xiaomi 12S Ultra',
+            'mayfly': 'Xiaomi 12S Pro',
+            'daumier': 'Xiaomi 12S',
+            'thor': 'Redmi K50 Ultra',
+            'rubens': 'Redmi K50 Pro',
+            'montblanc': 'Redmi K50',
+            'ingres': 'Redmi K40S',
+            'haydn': 'Redmi K40 Pro / Pro+',
+            'alioth': 'Redmi K40',
+            'umi': 'Mi 10',
+            'cas': 'Mi 10 Pro',
+            'cmi': 'Mi 10 Ultra',
+            'gauguin': 'Redmi K30 Ultra',
+            'cezanne': 'Redmi K30 Pro',
+            'phoenix': 'Redmi K30',
+            'lavender': 'Redmi Note 7',
+            'violet': 'Redmi Note 7 Pro'
+        };
+
         // 提取设备信息
         function extractDeviceInfoFromText(text) {
             const lines = text.split('\n');
             let deviceInfo = {
                 marketName: null,
                 model: null,
-                device: null
+                device: null,
+                brand: null
             };
 
             for (const line of lines) {
                 const marketNameMatch = line.match(/\[ro\.product\.marketname\]:\s*\[([^\]]+)\]/);
                 if (marketNameMatch) {
                     deviceInfo.marketName = marketNameMatch[1].trim();
-                    console.log("找到设备名称:", deviceInfo.marketName);
                     continue;
                 }
 
-                // 精确匹配 model
                 const modelMatch = line.match(/\[ro\.product\.model\]:\s*\[([^\]]+)\]/);
                 if (modelMatch) {
                     deviceInfo.model = modelMatch[1].trim();
-                    console.log("找到设备型号:", deviceInfo.model);
                     continue;
                 }
 
-                // 精确匹配 device
                 const deviceMatch = line.match(/\[ro\.product\.device\]:\s*\[([^\]]+)\]/);
                 if (deviceMatch) {
                     deviceInfo.device = deviceMatch[1].trim();
-                    console.log("找到设备代码:", deviceInfo.device);
                     continue;
                 }
 
-                // 如果已经找到所有信息，提前退出
+                const brandMatch = line.match(/\[ro\.product\.brand\]:\s*\[([^\]]+)\]/);
+                if (brandMatch) {
+                    deviceInfo.brand = brandMatch[1].trim();
+                    continue;
+                }
+
                 if (deviceInfo.marketName && deviceInfo.model && deviceInfo.device) {
                     break;
+                }
+            }
+
+            // 备用方案: 从 Build fingerprint 提取
+            if (!deviceInfo.marketName || !deviceInfo.device) {
+                const fpMatch = text.match(/Build fingerprint:\s*['"]([^'"]+)['"]/);
+                if (fpMatch) {
+                    const fp = fpMatch[1];
+                    const fpParts = fp.split('/');
+                    if (fpParts.length >= 3) {
+                        if (!deviceInfo.brand) deviceInfo.brand = fpParts[0];
+                        if (!deviceInfo.device) deviceInfo.device = fpParts[1];
+                        if (!deviceInfo.marketName && DEVICE_CODE_MAP[fpParts[1]]) {
+                            deviceInfo.marketName = DEVICE_CODE_MAP[fpParts[1]];
+                        }
+                        if (!deviceInfo.model && DEVICE_CODE_MAP[fpParts[1]]) {
+                            deviceInfo.model = DEVICE_CODE_MAP[fpParts[1]];
+                        }
+                    }
+                }
+            }
+
+            // 再备用: 从文件名提取 (bugreport-xxx-...)
+            if (!deviceInfo.marketName) {
+                const nameMatch = text.match(/bugreport-([^-]+(?:\s[^-]+)*)-/);
+                if (nameMatch) {
+                    deviceInfo.marketName = nameMatch[1].trim();
+                    if (!deviceInfo.model) deviceInfo.model = deviceInfo.marketName;
                 }
             }
 
@@ -782,6 +910,150 @@
             return result;
         }
 
+        // 解析 dumpsys battery 核心参数
+        function extractDumpsysBattery(text) {
+            const result = {
+                level: null,
+                scale: null,
+                status: null,
+                health: null,
+                present: null,
+                technology: null,
+                voltage: null,
+                temperature: null,
+                chargeCounter: null,
+                acPowered: null,
+                usbPowered: null,
+                wirelessPowered: null
+            };
+
+            const dumpMatch = text.match(/DUMP OF SERVICE battery:\s*\n([\s\S]*?)(?=---------\s*\d|DUMP OF SERVICE|$)/);
+            if (!dumpMatch) return result;
+
+            const section = dumpMatch[1];
+
+            const levelMatch = section.match(/level:\s*(\d+)/);
+            if (levelMatch) result.level = parseInt(levelMatch[1]);
+
+            const scaleMatch = section.match(/scale:\s*(\d+)/);
+            if (scaleMatch) result.scale = parseInt(scaleMatch[1]);
+
+            const statusMatch = section.match(/status:\s*(\d+)/);
+            if (statusMatch) result.status = parseInt(statusMatch[1]);
+
+            const healthMatch = section.match(/health:\s*(\d+)/);
+            if (healthMatch) result.health = parseInt(healthMatch[1]);
+
+            const presentMatch = section.match(/present:\s*(true|false)/);
+            if (presentMatch) result.present = presentMatch[1] === 'true';
+
+            const techMatch = section.match(/technology:\s*(\S+)/);
+            if (techMatch) result.technology = techMatch[1];
+
+            const voltMatch = section.match(/voltage:\s*(\d+)/);
+            if (voltMatch) result.voltage = parseInt(voltMatch[1]);
+
+            const tempMatch = section.match(/temperature:\s*(\d+)/);
+            if (tempMatch) result.temperature = parseInt(tempMatch[1]) / 10;
+
+            const counterMatch = section.match(/Charge counter:\s*(\d+)/);
+            if (counterMatch) result.chargeCounter = parseInt(counterMatch[1]);
+
+            const acMatch = section.match(/AC powered:\s*(true|false)/);
+            if (acMatch) result.acPowered = acMatch[1] === 'true';
+
+            const usbMatch = section.match(/USB powered:\s*(true|false)/);
+            if (usbMatch) result.usbPowered = usbMatch[1] === 'true';
+
+            const wirelessMatch = section.match(/Wireless powered:\s*(true|false)/);
+            if (wirelessMatch) result.wirelessPowered = wirelessMatch[1] === 'true';
+
+            return result;
+        }
+
+        // 解析内核 fuel gauge 数据 (fg_update_status)
+        function extractFuelGaugeData(text) {
+            const result = {
+                ssoc: null,
+                rsoc: null,
+                rawSoc: null,
+                vbat: null,
+                ibat: null,
+                temp: null,
+                ffc: null,
+                rm: null,
+                bf: null,
+                bc: null,
+                version: null
+            };
+
+            const fgMatch = text.match(/fg_update_status::\s*(.+)/);
+            if (!fgMatch) return result;
+
+            const line = fgMatch[1];
+
+            const ssocMatch = line.match(/ssoc:\s*(\d+)/);
+            if (ssocMatch) result.ssoc = parseInt(ssocMatch[1]);
+
+            const rsocMatch = line.match(/rsoc:\s*(\d+)/);
+            if (rsocMatch) result.rsoc = parseInt(rsocMatch[1]);
+
+            const rawSocMatch = line.match(/raw_soc:\s*(\d+)/);
+            if (rawSocMatch) result.rawSoc = parseInt(rawSocMatch[1]);
+
+            const vbatMatch = line.match(/vbat:\s*(\d+)/);
+            if (vbatMatch) result.vbat = parseInt(vbatMatch[1]);
+
+            const ibatMatch = line.match(/ibat:\s*(\d+)/);
+            if (ibatMatch) result.ibat = parseInt(ibatMatch[1]);
+
+            const tempMatch = line.match(/temp:\s*(\d+)/);
+            if (tempMatch) result.temp = parseInt(tempMatch[1]) / 10;
+
+            const ffcMatch = line.match(/ffc:\s*(\d+)/);
+            if (ffcMatch) result.ffc = parseInt(ffcMatch[1]);
+
+            const rmMatch = line.match(/rm:\s*(\d+)/);
+            if (rmMatch) result.rm = parseInt(rmMatch[1]);
+
+            const bfMatch = line.match(/bf:\s*(\d+)/);
+            if (bfMatch) result.bf = parseInt(bfMatch[1]);
+
+            const bcMatch = line.match(/bc:\s*(\d+)/);
+            if (bcMatch) result.bc = parseInt(bcMatch[1]);
+
+            const versionMatch = line.match(/version:\s*(\d+)/);
+            if (versionMatch) result.version = parseInt(versionMatch[1]);
+
+            return result;
+        }
+
+        // 解析 totalBatteryCapacity (DeviceStatisticsService)
+        function extractTotalBatteryCapacity(text) {
+            const match = text.match(/totalBatteryCapacity=(\d+)/);
+            if (match) return parseInt(match[1]);
+            return null;
+        }
+
+        // 解析 charge_full (BL-BSHelper)
+        function extractChargeFull(text) {
+            const match = text.match(/charge_full=(\d+)/);
+            if (match) return parseInt(match[1]) / 1000;
+            return null;
+        }
+
+        // 电池状态码转文字
+        function getBatteryStatusText(status) {
+            const map = { 1: '未知', 2: '充电中', 3: '放电中', 4: '未充电', 5: '已充满' };
+            return map[status] || '未知';
+        }
+
+        // 电池健康码转文字
+        function getBatteryHealthText(health) {
+            const map = { 1: '未知', 2: '良好', 3: '过热', 4: '损坏', 5: '过压', 6: '未知故障', 7: '温度过低' };
+            return map[health] || '未知';
+        }
+
         // 计算电池容量
         async function calculateBatteryCapacity() {
             const fileInput = document.getElementById('zip-file');
@@ -838,8 +1110,23 @@
                                     Object.assign(batteryInfo, stats);
                                 }
 
-                                // 使用最小学习容量作为当前容量
-                                const currentCapacity = batteryInfo.minLearnedCapacity || autoExtractedInfo.minLearnedCapacity;
+                                // 多来源确定当前实际容量，优先级: fuel gauge bf > batterystats learned > charge_full > totalBatteryCapacity
+                                let currentCapacity = null;
+                                let currentCapacitySource = null;
+
+                                if (autoExtractedInfo.fuelGauge && autoExtractedInfo.fuelGauge.bf) {
+                                    currentCapacity = autoExtractedInfo.fuelGauge.bf;
+                                    currentCapacitySource = '内核 Fuel Gauge (bf)';
+                                } else if (batteryInfo.minLearnedCapacity || autoExtractedInfo.minLearnedCapacity) {
+                                    currentCapacity = batteryInfo.minLearnedCapacity || autoExtractedInfo.minLearnedCapacity;
+                                    currentCapacitySource = 'batterystats 学习容量';
+                                } else if (autoExtractedInfo.chargeFull) {
+                                    currentCapacity = autoExtractedInfo.chargeFull;
+                                    currentCapacitySource = 'BL-BSHelper charge_full';
+                                } else if (autoExtractedInfo.totalBatteryCapacity) {
+                                    currentCapacity = autoExtractedInfo.totalBatteryCapacity;
+                                    currentCapacitySource = 'DeviceStatisticsService';
+                                }
 
                                 if (currentCapacity !== null && currentCapacity !== undefined) {
                                     showStatus("正在计算电池容量百分比...");
@@ -861,7 +1148,11 @@
                                     // 显示设备型号（如果提取到）
                                     if (autoExtractedInfo.deviceName || autoExtractedInfo.deviceModel) {
                                         const deviceName = autoExtractedInfo.deviceName || autoExtractedInfo.deviceModel;
-                                        resultMessage += `<p>设备型号: <strong>${deviceName}</strong></p>`;
+                                        resultMessage += `<p>设备型号: <strong>${deviceName}</strong>`;
+                                        if (autoExtractedInfo.deviceCode) {
+                                            resultMessage += ` <span style="color: #888; font-size: 0.9em;">(代号: ${autoExtractedInfo.deviceCode})</span>`;
+                                        }
+                                        resultMessage += `</p>`;
                                     }
 
                                     // 显示诊断时间（如果提取到）
@@ -872,9 +1163,22 @@
                                     resultMessage += `
                                     <p>原始设计容量: <strong>${finalInitialCapacity} mAh</strong>
                                     ${autoExtractedInfo.designCapacity ? '<span style="color: green;">(自动检测)</span>' : '<span style="color: orange;">(手动输入)</span>'}</p>
-                                    <p>当前实际容量: <strong>${currentCapacity} mAh</strong></p>
+                                    <p>当前实际容量: <strong>${currentCapacity} mAh</strong>
+                                    ${currentCapacitySource ? `<span style="color: #666; font-size: 0.9em;">(来源: ${currentCapacitySource})</span>` : ''}</p>
                                     <p>电池健康度: <strong>${percentage.toFixed(2)}%</strong> <span style="margin-left: 10px; font-size: 0.9em; color: ${getRatingColor(percentage)}">(${rating})</span></p>
                             `;
+
+                                    // 电池实时状态 (来自 dumpsys battery)
+                                    if (autoExtractedInfo.dumpsys) {
+                                        resultMessage += `<p><strong>电池实时状态</strong></p>`;
+                                        const d = autoExtractedInfo.dumpsys;
+                                        if (d.batteryLevel !== null) resultMessage += `<p>当前电量: <strong>${d.batteryLevel}%</strong></p>`;
+                                        if (d.voltage !== null) resultMessage += `<p>电池电压: <strong>${(d.voltage / 1000).toFixed(3)} V</strong> (${d.voltage} mV)</p>`;
+                                        if (d.temperature !== null) resultMessage += `<p>电池温度: <strong>${d.temperature}°C</strong></p>`;
+                                        if (d.technology) resultMessage += `<p>电池类型: <strong>${d.technology}</strong></p>`;
+                                        if (d.status !== null) resultMessage += `<p>充电状态: <strong>${getBatteryStatusText(d.status)}</strong></p>`;
+                                        if (d.health !== null) resultMessage += `<p>健康状态: <strong>${getBatteryHealthText(d.health)}</strong></p>`;
+                                    }
 
                                     resultMessage += `
                                 <p><strong>电池硬件信息</strong></p>
@@ -887,16 +1191,44 @@
                                         resultMessage += `<p>上次学习容量: <strong>${autoExtractedInfo.lastLearnedCapacity} mAh</strong></p>`;
                                     }
                                     if (autoExtractedInfo.minLearnedCapacity) {
-                                        resultMessage += `<p>最小学习容量: <strong>${autoExtractedInfo.minLearnedCapacity} mAh</strong> </p>`;
+                                        resultMessage += `<p>最小学习容量: <strong>${autoExtractedInfo.minLearnedCapacity} mAh</strong></p>`;
                                     }
                                     if (autoExtractedInfo.maxLearnedCapacity) {
                                         resultMessage += `<p>最大学习容量: <strong>${autoExtractedInfo.maxLearnedCapacity} mAh</strong></p>`;
                                     }
-                                    if (autoExtractedInfo.cycleCount) {
+
+                                    // Fuel Gauge 详细数据
+                                    if (autoExtractedInfo.fuelGauge) {
+                                        const fg = autoExtractedInfo.fuelGauge;
+                                        resultMessage += `<p style="margin-top: 12px;"><strong>内核 Fuel Gauge 数据</strong></p>`;
+                                        if (fg.bf !== null) resultMessage += `<p>满电容量 (bf): <strong>${fg.bf} mAh</strong></p>`;
+                                        if (fg.rm !== null) resultMessage += `<p>剩余容量 (rm): <strong>${fg.rm} mAh</strong></p>`;
+                                        if (fg.bc !== null) resultMessage += `<p>循环次数 (bc): <strong>${fg.bc} 次</strong></p>`;
+                                        if (fg.ssoc !== null) resultMessage += `<p>系统SOC (ssoc): <strong>${fg.ssoc}%</strong></p>`;
+                                        if (fg.rsoc !== null) resultMessage += `<p>原始SOC (rsoc): <strong>${fg.rsoc}%</strong></p>`;
+                                        if (fg.vbat !== null) resultMessage += `<p>电池电压 (vbat): <strong>${(fg.vbat / 1000).toFixed(3)} V</strong></p>`;
+                                        if (fg.ibat !== null) resultMessage += `<p>电池电流 (ibat): <strong>${fg.ibat} mA</strong></p>`;
+                                        if (fg.temp !== null) resultMessage += `<p>电池温度 (temp): <strong>${fg.temp}°C</strong></p>`;
+                                        if (fg.version !== null) resultMessage += `<p>固件版本: <strong>${fg.version}</strong></p>`;
+                                    }
+
+                                    // 循环次数 (如果 fuel gauge 没有但其他来源有)
+                                    if (autoExtractedInfo.cycleCount && (!autoExtractedInfo.fuelGauge || autoExtractedInfo.fuelGauge.bc === null)) {
                                         resultMessage += `<p>充电循环次数: <strong>${autoExtractedInfo.cycleCount} 次</strong></p>`;
                                         resultMessage += `<p style="font-size: 0.9em; color: #666;">满充容量会随着循环次数的增加而逐渐减少</p>`;
-                                    } else {
-                                        resultMessage += `<p>充电循环次数: <strong>未检测到</strong> (不同机型数据有差异)</p>`;
+                                    } else if (!autoExtractedInfo.cycleCount) {
+                                        resultMessage += `<p>充电循环次数: <strong>未检测到</strong> (部分机型在内核 fuel gauge 中提供)</p>`;
+                                    }
+
+                                    // 多来源容量对比
+                                    if (autoExtractedInfo.capacitySources && autoExtractedInfo.capacitySources.length > 1) {
+                                        resultMessage += `<p style="margin-top: 12px;"><strong>多来源容量对比</strong></p>`;
+                                        resultMessage += `<div style="background: #f7fafc; padding: 10px; border-radius: 6px; font-size: 0.9em;">`;
+                                        for (const src of autoExtractedInfo.capacitySources) {
+                                            const pct = ((src.value / finalInitialCapacity) * 100).toFixed(1);
+                                            resultMessage += `<p style="margin: 4px 0;">${src.source}: <strong>${src.value} mAh</strong> (${pct}%)</p>`;
+                                        }
+                                        resultMessage += `</div>`;
                                     }
 
                                     resultMessage += `
