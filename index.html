@@ -631,6 +631,18 @@
                                     if (stats.lastLearnedCapacity) {
                                         autoExtractedInfo.capacitySources.push({ value: stats.lastLearnedCapacity, source: 'batterystats learned' });
                                     }
+                                    // batterystats 的 Estimated battery capacity 就是系统报告的设计容量，自动填充
+                                    if (!autoExtractedInfo.designCapacity && stats.estimatedCapacity) {
+                                        autoExtractedInfo.designCapacity = stats.estimatedCapacity;
+                                    }
+                                }
+
+                                // 兜底: 设备代号 -> 设计容量映射表
+                                if (!autoExtractedInfo.designCapacity && autoExtractedInfo.deviceCode) {
+                                    const capMap = getDesignCapacityMap();
+                                    if (capMap[autoExtractedInfo.deviceCode]) {
+                                        autoExtractedInfo.designCapacity = capMap[autoExtractedInfo.deviceCode];
+                                    }
                                 }
 
                                 const dumpsys = extractDumpsysBattery(content);
@@ -725,6 +737,23 @@
             'lavender': 'Redmi Note 7',
             'violet': 'Redmi Note 7 Pro'
         };
+
+        // 设备代号 -> 设计容量 (mAh)，batterystats 没有 estimated capacity 时兜底用
+        function getDesignCapacityMap() {
+            return {
+                'marble': 5000, 'nuwa': 4820, 'fuxi': 4500,
+                'shennong': 4610, 'houji': 4880, 'shennongp': 5300,
+                'duchamp': 5000, 'mondrian': 5000, 'vermeer': 5500,
+                'rock': 5000, 'gold': 5100, 'sapphire': 5000,
+                'ruby': 5000, 'stone': 5000, 'xaga': 5080, 'xagapro': 4400,
+                'zizhan': 4860, 'mayfly': 4600, 'daumier': 4500,
+                'thor': 5000, 'rubens': 5000, 'montblanc': 5500,
+                'ingres': 4500, 'haydn': 4520, 'alioth': 4520,
+                'umi': 4780, 'cas': 4500, 'cmi': 4500,
+                'gauguin': 4500, 'cezanne': 4700, 'phoenix': 4500,
+                'lavender': 4000, 'violet': 4000
+            };
+        }
 
         // 提取设备信息
         function extractDeviceInfoFromText(text) {
@@ -932,40 +961,40 @@
 
             const section = dumpMatch[1];
 
-            const levelMatch = section.match(/level:\s*(\d+)/);
+            const levelMatch = section.match(/^\s*level:\s*(\d+)/m);
             if (levelMatch) result.level = parseInt(levelMatch[1]);
 
-            const scaleMatch = section.match(/scale:\s*(\d+)/);
+            const scaleMatch = section.match(/^\s*scale:\s*(\d+)/m);
             if (scaleMatch) result.scale = parseInt(scaleMatch[1]);
 
-            const statusMatch = section.match(/status:\s*(\d+)/);
+            const statusMatch = section.match(/^\s*status:\s*(\d+)/m);
             if (statusMatch) result.status = parseInt(statusMatch[1]);
 
-            const healthMatch = section.match(/health:\s*(\d+)/);
+            const healthMatch = section.match(/^\s*health:\s*(\d+)/m);
             if (healthMatch) result.health = parseInt(healthMatch[1]);
 
-            const presentMatch = section.match(/present:\s*(true|false)/);
+            const presentMatch = section.match(/^\s*present:\s*(true|false)/m);
             if (presentMatch) result.present = presentMatch[1] === 'true';
 
-            const techMatch = section.match(/technology:\s*(\S+)/);
+            const techMatch = section.match(/^\s*technology:\s*(\S+)/m);
             if (techMatch) result.technology = techMatch[1];
 
-            const voltMatch = section.match(/voltage:\s*(\d+)/);
+            const voltMatch = section.match(/^\s*voltage:\s*(\d+)/m);
             if (voltMatch) result.voltage = parseInt(voltMatch[1]);
 
-            const tempMatch = section.match(/temperature:\s*(\d+)/);
+            const tempMatch = section.match(/^\s*temperature:\s*(\d+)/m);
             if (tempMatch) result.temperature = parseInt(tempMatch[1]) / 10;
 
-            const counterMatch = section.match(/Charge counter:\s*(\d+)/);
+            const counterMatch = section.match(/^\s*Charge counter:\s*(\d+)/m);
             if (counterMatch) result.chargeCounter = parseInt(counterMatch[1]);
 
-            const acMatch = section.match(/AC powered:\s*(true|false)/);
+            const acMatch = section.match(/^\s*AC powered:\s*(true|false)/m);
             if (acMatch) result.acPowered = acMatch[1] === 'true';
 
-            const usbMatch = section.match(/USB powered:\s*(true|false)/);
+            const usbMatch = section.match(/^\s*USB powered:\s*(true|false)/m);
             if (usbMatch) result.usbPowered = usbMatch[1] === 'true';
 
-            const wirelessMatch = section.match(/Wireless powered:\s*(true|false)/);
+            const wirelessMatch = section.match(/^\s*Wireless powered:\s*(true|false)/m);
             if (wirelessMatch) result.wirelessPowered = wirelessMatch[1] === 'true';
 
             return result;
@@ -1172,12 +1201,12 @@
                                     if (autoExtractedInfo.dumpsys) {
                                         resultMessage += `<p><strong>电池实时状态</strong></p>`;
                                         const d = autoExtractedInfo.dumpsys;
-                                        if (d.batteryLevel !== null) resultMessage += `<p>当前电量: <strong>${d.batteryLevel}%</strong></p>`;
-                                        if (d.voltage !== null) resultMessage += `<p>电池电压: <strong>${(d.voltage / 1000).toFixed(3)} V</strong> (${d.voltage} mV)</p>`;
-                                        if (d.temperature !== null) resultMessage += `<p>电池温度: <strong>${d.temperature}°C</strong></p>`;
+                                        if (d.level !== null && d.level !== undefined) resultMessage += `<p>当前电量: <strong>${d.level}%</strong></p>`;
+                                        if (d.voltage !== null && d.voltage !== undefined) resultMessage += `<p>电池电压: <strong>${(d.voltage / 1000).toFixed(3)} V</strong> (${d.voltage} mV)</p>`;
+                                        if (d.temperature !== null && d.temperature !== undefined) resultMessage += `<p>电池温度: <strong>${d.temperature}°C</strong></p>`;
                                         if (d.technology) resultMessage += `<p>电池类型: <strong>${d.technology}</strong></p>`;
-                                        if (d.status !== null) resultMessage += `<p>充电状态: <strong>${getBatteryStatusText(d.status)}</strong></p>`;
-                                        if (d.health !== null) resultMessage += `<p>健康状态: <strong>${getBatteryHealthText(d.health)}</strong></p>`;
+                                        if (d.status !== null && d.status !== undefined) resultMessage += `<p>充电状态: <strong>${getBatteryStatusText(d.status)}</strong></p>`;
+                                        if (d.health !== null && d.health !== undefined) resultMessage += `<p>健康状态: <strong>${getBatteryHealthText(d.health)}</strong></p>`;
                                     }
 
                                     resultMessage += `
