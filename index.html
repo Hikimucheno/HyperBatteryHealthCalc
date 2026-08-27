@@ -527,13 +527,25 @@
                                 }
 
                                 // fuel gauge: 只读取 fg_update_status 那一行
-                                const fgLine = grabLine(content, 'fg_update_status::');
+                                const fgLine = grabLine(content, 'fg_update_status');
                                 if (fgLine) {
                                     const fuelGauge = extractFuelGaugeData(fgLine);
-                                    if (fuelGauge.bf !== null) {
+                                    const hasFgData = fuelGauge.bf !== null || fuelGauge.ssoc !== null || fuelGauge.rsoc !== null || fuelGauge.vbat !== null || fuelGauge.rm !== null;
+                                    if (hasFgData) {
                                         autoExtractedInfo.fuelGauge = fuelGauge;
-                                        autoExtractedInfo.capacitySources.push({ value: fuelGauge.bf, source: 'kernel fuel gauge bf' });
+                                        if (fuelGauge.bf !== null) {
+                                            autoExtractedInfo.capacitySources.push({ value: fuelGauge.bf, source: 'kernel fuel gauge bf' });
+                                        }
                                         if (fuelGauge.bc !== null) autoExtractedInfo.cycleCount = fuelGauge.bc;
+                                    }
+                                }
+
+                                // mBatteryCycleCount: 新机型循环次数来源 (如 K80 Pro)
+                                if (autoExtractedInfo.cycleCount === null) {
+                                    const cycleLine = grabLine(content, 'mBatteryCycleCount=');
+                                    if (cycleLine) {
+                                        const cm = cycleLine.match(/mBatteryCycleCount=(\d+)/);
+                                        if (cm) autoExtractedInfo.cycleCount = parseInt(cm[1]);
                                     }
                                 }
 
@@ -616,7 +628,8 @@
             'cezanne': 'Redmi K30 Pro',
             'phoenix': 'Redmi K30',
             'lavender': 'Redmi Note 7',
-            'violet': 'Redmi Note 7 Pro'
+            'violet': 'Redmi Note 7 Pro',
+            'miro': 'Redmi K80 Pro'
         };
 
         // 设备代号 -> 设计容量 (mAh)，batterystats 没有 estimated capacity 时兜底用
@@ -632,7 +645,8 @@
                 'ingres': 4500, 'haydn': 4520, 'alioth': 4520,
                 'umi': 4780, 'cas': 4500, 'cmi': 4500,
                 'gauguin': 4500, 'cezanne': 4700, 'phoenix': 4500,
-                'lavender': 4000, 'violet': 4000
+                'lavender': 4000, 'violet': 4000,
+                'miro': 6000
             };
         }
 
@@ -897,43 +911,68 @@
                 version: null
             };
 
+            // 旧格式: fg_update_status:: ssoc: xx, rsoc: xx ...
             const fgMatch = text.match(/fg_update_status::\s*(.+)/);
-            if (!fgMatch) return result;
+            if (fgMatch) {
+                const line = fgMatch[1];
 
-            const line = fgMatch[1];
+                const ssocMatch = line.match(/ssoc:\s*(\d+)/);
+                if (ssocMatch) result.ssoc = parseInt(ssocMatch[1]);
 
-            const ssocMatch = line.match(/ssoc:\s*(\d+)/);
-            if (ssocMatch) result.ssoc = parseInt(ssocMatch[1]);
+                const rsocMatch = line.match(/rsoc:\s*(\d+)/);
+                if (rsocMatch) result.rsoc = parseInt(rsocMatch[1]);
 
-            const rsocMatch = line.match(/rsoc:\s*(\d+)/);
-            if (rsocMatch) result.rsoc = parseInt(rsocMatch[1]);
+                const rawSocMatch = line.match(/raw_soc:\s*(\d+)/);
+                if (rawSocMatch) result.rawSoc = parseInt(rawSocMatch[1]);
 
-            const rawSocMatch = line.match(/raw_soc:\s*(\d+)/);
-            if (rawSocMatch) result.rawSoc = parseInt(rawSocMatch[1]);
+                const vbatMatch = line.match(/vbat:\s*(\d+)/);
+                if (vbatMatch) result.vbat = parseInt(vbatMatch[1]);
 
-            const vbatMatch = line.match(/vbat:\s*(\d+)/);
-            if (vbatMatch) result.vbat = parseInt(vbatMatch[1]);
+                const ibatMatch = line.match(/ibat:\s*(\d+)/);
+                if (ibatMatch) result.ibat = parseInt(ibatMatch[1]);
 
-            const ibatMatch = line.match(/ibat:\s*(\d+)/);
-            if (ibatMatch) result.ibat = parseInt(ibatMatch[1]);
+                const tempMatch = line.match(/temp:\s*(\d+)/);
+                if (tempMatch) result.temp = parseInt(tempMatch[1]) / 10;
 
-            const tempMatch = line.match(/temp:\s*(\d+)/);
-            if (tempMatch) result.temp = parseInt(tempMatch[1]) / 10;
+                const ffcMatch = line.match(/ffc:\s*(\d+)/);
+                if (ffcMatch) result.ffc = parseInt(ffcMatch[1]);
 
-            const ffcMatch = line.match(/ffc:\s*(\d+)/);
-            if (ffcMatch) result.ffc = parseInt(ffcMatch[1]);
+                const rmMatch = line.match(/rm:\s*(\d+)/);
+                if (rmMatch) result.rm = parseInt(rmMatch[1]);
 
-            const rmMatch = line.match(/rm:\s*(\d+)/);
-            if (rmMatch) result.rm = parseInt(rmMatch[1]);
+                const bfMatch = line.match(/bf:\s*(\d+)/);
+                if (bfMatch) result.bf = parseInt(bfMatch[1]);
 
-            const bfMatch = line.match(/bf:\s*(\d+)/);
-            if (bfMatch) result.bf = parseInt(bfMatch[1]);
+                const bcMatch = line.match(/bc:\s*(\d+)/);
+                if (bcMatch) result.bc = parseInt(bcMatch[1]);
 
-            const bcMatch = line.match(/bc:\s*(\d+)/);
-            if (bcMatch) result.bc = parseInt(bcMatch[1]);
+                const versionMatch = line.match(/version:\s*(\d+)/);
+                if (versionMatch) result.version = parseInt(versionMatch[1]);
 
-            const versionMatch = line.match(/version:\s*(\d+)/);
-            if (versionMatch) result.version = parseInt(versionMatch[1]);
+                return result;
+            }
+
+            // 新格式 (K80 Pro 等): fg_update_status:2393 UISOC:31 CURRENT:523000 RSOC:29 VOLTAGE:3728 TEMP:378 ...
+            const newFgMatch = text.match(/fg_update_status:(\d+)\s+(.+)/);
+            if (newFgMatch) {
+                result.rm = parseInt(newFgMatch[1]); // 第一个数字是剩余容量 mAh
+                const line = newFgMatch[2];
+
+                const uisocMatch = line.match(/UISOC:(\d+)/);
+                if (uisocMatch) result.ssoc = parseInt(uisocMatch[1]);
+
+                const rsocMatch = line.match(/RSOC:(\d+)/);
+                if (rsocMatch) result.rsoc = parseInt(rsocMatch[1]);
+
+                const voltageMatch = line.match(/VOLTAGE:(\d+)/);
+                if (voltageMatch) result.vbat = parseInt(voltageMatch[1]);
+
+                const currentMatch = line.match(/CURRENT:(\d+)/);
+                if (currentMatch) result.ibat = parseInt(currentMatch[1]) / 1000; // 新格式单位是 µA，转 mA
+
+                const tempMatch = line.match(/TEMP:(\d+)/);
+                if (tempMatch) result.temp = parseInt(tempMatch[1]) / 10;
+            }
 
             return result;
         }
